@@ -23,6 +23,8 @@ package de.adorsys.keycloak.config.provider;
 import de.adorsys.keycloak.config.AbstractImportIT;
 import de.adorsys.keycloak.config.exception.KeycloakProviderException;
 import de.adorsys.keycloak.config.resource.ManagementPermissions;
+import de.adorsys.keycloak.config.util.ResponseUtil;
+
 import org.apache.http.conn.ConnectTimeoutException;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -33,6 +35,8 @@ import org.springframework.test.context.TestPropertySource;
 
 import java.net.SocketTimeoutException;
 import java.net.URISyntaxException;
+
+import jakarta.ws.rs.NotAuthorizedException;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.ProcessingException;
 
@@ -158,6 +162,18 @@ class KeycloakProviderIT {
             RuntimeException thrown = assertThrows(RuntimeException.class, () -> keycloakProvider.getCustomApiProxy(ManagementPermissions.class));
             assertNotNull(thrown.getCause());
             assertTrue(thrown.getCause() instanceof URISyntaxException);
+        }
+    }
+
+    @Nested
+    @TestPropertySource(properties = {
+            "keycloak.auth-token=wrong-secret"
+    })
+    class InvalidAuthToken extends AbstractImportIT {
+        @Test
+        void run() {
+            NotAuthorizedException thrown = assertThrows(NotAuthorizedException.class, keycloakProvider::getInstance);
+            assertThat(ResponseUtil.getErrorMessage(thrown), matchesPattern(".*\\{\"error\":\"HTTP 401 Unauthorized\"}.*"));
         }
     }
 }

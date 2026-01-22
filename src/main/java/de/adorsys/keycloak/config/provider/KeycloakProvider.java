@@ -34,6 +34,7 @@ import org.jboss.resteasy.client.jaxrs.internal.BasicAuthentication;
 import org.jboss.resteasy.plugins.providers.jackson.ResteasyJackson2Provider;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.KeycloakBuilder;
+import org.keycloak.admin.client.token.TokenManager;
 import org.keycloak.representations.info.ProfileInfoRepresentation;
 import org.keycloak.representations.info.ServerInfoRepresentation;
 import org.slf4j.Logger;
@@ -46,6 +47,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.text.MessageFormat;
 import java.time.Duration;
+import java.util.Optional;
 import java.util.function.Supplier;
 
 import jakarta.ws.rs.WebApplicationException;
@@ -172,7 +174,12 @@ public class KeycloakProvider implements AutoCloseable {
     }
 
     public void refreshToken() {
-        getInstance().tokenManager().refreshToken();
+        TokenManager tokenManager = getInstance().tokenManager();
+        if (tokenManager == null) {
+            logger.warn("Skipped authentication token refresh because it was provided as a system property");
+        } else {
+            tokenManager.refreshToken();
+        }
     }
 
     public <T> T getCustomApiProxy(Class<T> proxyClass) {
@@ -222,7 +229,10 @@ public class KeycloakProvider implements AutoCloseable {
 
     private Keycloak getKeycloak() {
         Keycloak keycloakInstance = getKeycloakInstance(properties.getUrl());
-        keycloakInstance.tokenManager().getAccessToken();
+
+        // Authenticate by requesting access token now unless user has provided authentication token
+        // as a system property (token manager is null).
+        Optional.ofNullable(keycloakInstance.tokenManager()).map(TokenManager::getAccessToken);
 
         return keycloakInstance;
     }
@@ -237,6 +247,7 @@ public class KeycloakProvider implements AutoCloseable {
                 .username(properties.getUser())
                 .password(properties.getPassword())
                 .resteasyClient(resteasyClient)
+                .authorization(properties.getAuthToken())
                 .build();
     }
 
@@ -278,7 +289,14 @@ public class KeycloakProvider implements AutoCloseable {
      * returns 204 if successful, 400 if not with a json error response.
      */
     private void logout() {
-        String refreshToken = this.keycloak.tokenManager().getAccessToken().getRefreshToken();
+        TokenManager tokenManager = this.keycloak.tokenManager();
+        // if there is no token manager, user has provided an auth token and is responsible of it
+        // personally
+        if (tokenManager == null) {
+            return;
+        }
+
+        String refreshToken = tokenManager.getAccessToken().getRefreshToken();
         // if we do not have a refreshToken, we are not able ot logout (grant_type=client_credentials)
         if (refreshToken == null) {
             return;

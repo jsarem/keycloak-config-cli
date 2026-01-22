@@ -35,20 +35,21 @@ import static org.mockito.Mockito.*;
 class KeycloakProviderTest {
 
     private KeycloakProvider createProvider() throws Exception {
-    KeycloakConfigProperties props = mock(KeycloakConfigProperties.class);
-    when(props.getUrl()).thenReturn("http://localhost:8080/");
-    when(props.getLoginRealm()).thenReturn("master");
-    when(props.getClientId()).thenReturn("");
-    when(props.getGrantType()).thenReturn("");
-    when(props.getClientSecret()).thenReturn("");
-    when(props.getUser()).thenReturn("");
-    when(props.getPassword()).thenReturn("");
-    when(props.isSslVerify()).thenReturn(true);
-    when(props.getHttpProxy()).thenReturn(null);
-    when(props.getConnectTimeout()).thenReturn(java.time.Duration.ofSeconds(1));
-    when(props.getReadTimeout()).thenReturn(java.time.Duration.ofSeconds(1));
-    when(props.getAvailabilityCheck()).thenReturn(new KeycloakConfigProperties.KeycloakAvailabilityCheck(false, java.time.Duration.ofSeconds(1), java.time.Duration.ofSeconds(1)));
-        
+        KeycloakConfigProperties props = mock(KeycloakConfigProperties.class);
+        when(props.getUrl()).thenReturn("http://localhost:8080/");
+        when(props.getLoginRealm()).thenReturn("master");
+        when(props.getClientId()).thenReturn("");
+        when(props.getGrantType()).thenReturn("");
+        when(props.getAuthToken()).thenReturn(null);
+        when(props.getClientSecret()).thenReturn("");
+        when(props.getUser()).thenReturn("");
+        when(props.getPassword()).thenReturn("");
+        when(props.isSslVerify()).thenReturn(true);
+        when(props.getHttpProxy()).thenReturn(null);
+        when(props.getConnectTimeout()).thenReturn(java.time.Duration.ofSeconds(1));
+        when(props.getReadTimeout()).thenReturn(java.time.Duration.ofSeconds(1));
+        when(props.getAvailabilityCheck()).thenReturn(new KeycloakConfigProperties.KeycloakAvailabilityCheck(false, java.time.Duration.ofSeconds(1), java.time.Duration.ofSeconds(1)));
+
         Constructor<KeycloakProvider> ctor = KeycloakProvider.class.getDeclaredConstructor(KeycloakConfigProperties.class);
         ctor.setAccessible(true);
         return ctor.newInstance(props);

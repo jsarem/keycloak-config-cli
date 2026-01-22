@@ -20,8 +20,16 @@
 
 package de.adorsys.keycloak.config.test.util;
 
+import static org.keycloak.OAuth2Constants.CLIENT_CREDENTIALS;
+import static org.keycloak.OAuth2Constants.PASSWORD;
+
+import jakarta.ws.rs.WebApplicationException;
+
 import de.adorsys.keycloak.config.properties.KeycloakConfigProperties;
+import de.adorsys.keycloak.config.util.ResponseUtil;
+
 import org.keycloak.admin.client.Keycloak;
+import org.keycloak.admin.client.KeycloakBuilder;
 import org.keycloak.representations.AccessTokenResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -30,6 +38,7 @@ import org.springframework.stereotype.Component;
 @Component
 @ConditionalOnProperty(prefix = "run", name = "operation", havingValue = "IMPORT", matchIfMissing = true)
 public class KeycloakAuthentication {
+
     private final KeycloakConfigProperties keycloakConfigProperties;
 
     @Autowired
@@ -37,6 +46,22 @@ public class KeycloakAuthentication {
             KeycloakConfigProperties keycloakConfigProperties
     ) {
         this.keycloakConfigProperties = keycloakConfigProperties;
+    }
+
+    public AccessTokenResponse login(
+            String realm,
+            String clientId,
+            String clientSecret
+    ) {
+        return login(
+                keycloakConfigProperties.getUrl(),
+                realm,
+                clientId,
+                clientSecret,
+                CLIENT_CREDENTIALS,
+                null,
+                null
+        );
     }
 
     public AccessTokenResponse login(
@@ -64,7 +89,31 @@ public class KeycloakAuthentication {
             String username,
             String password
     ) {
-        return Keycloak.getInstance(url, realm, username, password, clientId, clientSecret)
-                .tokenManager().getAccessToken();
+        return login(url, realm, clientId, clientSecret, PASSWORD, username, password);
+    }
+
+    private AccessTokenResponse login(
+            String url,
+            String realm,
+            String clientId,
+            String clientSecret,
+            String grantType,
+            String username,
+            String password
+    ) {
+        try (Keycloak keycloak = KeycloakBuilder.builder()
+                .serverUrl(url)
+                .realm(realm)
+                .clientId(clientId)
+                .clientSecret(clientSecret)
+                .grantType(grantType)
+                .username(username)
+                .password(password)
+                .build()) {
+            return keycloak.tokenManager().getAccessToken();
+        } catch (WebApplicationException e) {
+            var asd = ResponseUtil.getErrorMessage(e);
+            throw new RuntimeException(e);
+        }
     }
 }

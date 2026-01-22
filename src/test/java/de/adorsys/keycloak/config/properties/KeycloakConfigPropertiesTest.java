@@ -45,10 +45,11 @@ import static org.hamcrest.core.Is.is;
         "keycloak.ssl-verify=false",
         "keycloak.url=https://localhost:8443",
         "keycloak.login-realm=moped",
-        "keycloak.client-id=moped",
         "keycloak.client-id=moped-client",
         "keycloak.user=otherUser",
         "keycloak.password=otherPassword",
+        "keycloak.grant-type=password",
+        "keycloak.auth-token=secret-token",
         "keycloak.http-proxy=http://localhost:8080",
         "keycloak.connect-timeout=2m",
         "keycloak.read-timeout=20s",
@@ -68,6 +69,8 @@ class KeycloakConfigPropertiesTest {
         assertThat(properties.getUser(), is("otherUser"));
         assertThat(properties.getPassword(), is("otherPassword"));
         assertThat(properties.getUrl(), is("https://localhost:8443"));
+        assertThat(properties.getGrantType(), is("password"));
+        assertThat(properties.getAuthToken(), is("secret-token"));
         assertThat(properties.isSslVerify(), is(false));
         assertThat(properties.getHttpProxy(), is(URI.create("http://localhost:8080").toURL()));
         assertThat(properties.getConnectTimeout(), is(Duration.ofSeconds(120)));
