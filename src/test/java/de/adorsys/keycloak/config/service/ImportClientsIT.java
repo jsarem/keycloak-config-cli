@@ -2621,6 +2621,21 @@ class ImportClientsIT extends AbstractImportIT {
         assertThat(otherClient, nullValue());
     }
 
+    @Test
+    @Order(99)
+    void shouldNotUpdateRealmManagementClient() throws IOException {
+        doImport("99_update_realm_management_client.json");
+        ClientRepresentation client = keycloakRepository.getClient(REALM_NAME, "realm-management");
+
+        if (VersionUtil.ge(KEYCLOAK_VERSION, "26.7")) {
+            // Editing realm-management client was disabled in 26.7. We don't want to throw error because
+            // the client may include authorization policies and resources that still need to be imported.
+            assertThat(client.getDescription(), nullValue());
+        } else {
+            assertThat(client.getDescription(), is("Updated"));
+        }
+    }
+
     /**
      * @param id (not client-id)
      */

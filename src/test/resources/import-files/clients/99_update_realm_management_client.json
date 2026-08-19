@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "realm": "realmWithClients",
+  "clients": [
+    {
+      "clientId": "realm-management",
+      "name": "realm-management",
+      "description": "Updated"
+    }
+  ]
+}

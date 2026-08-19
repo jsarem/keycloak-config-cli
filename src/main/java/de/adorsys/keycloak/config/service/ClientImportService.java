@@ -34,6 +34,7 @@ import de.adorsys.keycloak.config.util.KeycloakUtil;
 import de.adorsys.keycloak.config.util.ParallelUtil;
 import de.adorsys.keycloak.config.util.ProtocolMapperUtil;
 import de.adorsys.keycloak.config.util.ResponseUtil;
+import de.adorsys.keycloak.config.util.VersionUtil;
 import org.apache.commons.lang3.ArrayUtils;
 import org.keycloak.common.util.CollectionUtil;
 import org.keycloak.representations.idm.ClientRepresentation;
@@ -157,6 +158,10 @@ public class ClientImportService {
         }
     }
 
+    private static boolean isClient(String name, ClientRepresentation client) {
+        return name.equals(client.getClientId()) || name.equals(client.getName());
+    }
+
     private void createOrUpdateClient(
             RealmImport realmImport,
             ClientRepresentation client
@@ -164,21 +169,28 @@ public class ClientImportService {
         String realmName = realmImport.getRealm();
 
         // Skip admin-permissions client only if FGAP V2 is active
-        boolean isAdminPermissionsClient = ADMIN_PERMISSIONS_CLIENT_ID.equals(client.getClientId())
-                || ADMIN_PERMISSIONS_CLIENT_ID.equals(client.getName());
+        boolean isAdminPermissionsClient = isClient(ADMIN_PERMISSIONS_CLIENT_ID, client);
+        boolean isRealmManagementClient = isClient(REALM_MANAGEMENT_CLIENT_ID, client);
+        boolean realmManagementEditable = VersionUtil.lt(keycloakProvider.getKeycloakVersion(), "26.7");
+
         if (isAdminPermissionsClient && keycloakProvider.isFgapV2Active()) {
-            logger.info("Skipping 'admin-permissions' client in realm '{}' - "
-                    + "FGAP V2 is active and this client is system-managed by Keycloak. "
-                    + "Remove it from your import configuration and use 'adminPermissionsEnabled: true' at realm level instead.",
-                    realmName);
+            logger.info("Skipping '{}}' client in realm '{}' - "
+                            + "FGAP V2 is active and this client is system-managed by Keycloak. "
+                            + "Remove it from your import configuration and use 'adminPermissionsEnabled: true' at realm level instead.",
+                    ADMIN_PERMISSIONS_CLIENT_ID, realmName);
+            return;
+        } else if (isRealmManagementClient && !realmManagementEditable) {
+            logger.info("Skipping '{}' client in realm '{}' - "
+                            + "This client is considered to be system-managed by Keycloak since version 26.7.0.",
+                    REALM_MANAGEMENT_CLIENT_ID, realmName);
             return;
         }
 
         // https://github.com/keycloak/keycloak/blob/74695c02423345dab892a0808bf9203c3f92af7c/server-spi-private/src/main/java/org/keycloak/models/utils/RepresentationToModel.java#L2878-L2881
         if (importConfigProperties.isValidate()
                 && client.getAuthorizationSettings() != null
-                && !REALM_MANAGEMENT_CLIENT_ID.equals(client.getClientId())
-                && !ADMIN_PERMISSIONS_CLIENT_ID.equals(client.getClientId())) {
+                && !isRealmManagementClient
+                && !isAdminPermissionsClient) {
             if (TRUE.equals(client.isBearerOnly()) || TRUE.equals(client.isPublicClient())) {
                 throw new ImportProcessingException(
                         "Unsupported authorization settings for client '%s' in realm '%s': client must be confidential.",
@@ -207,8 +219,7 @@ public class ClientImportService {
             updateClientIfNeeded(realmName, client, existingClient.get());
         } else {
             // Don't create system clients - they should already exist
-            if (REALM_MANAGEMENT_CLIENT_ID.equals(client.getClientId())
-                    || ADMIN_PERMISSIONS_CLIENT_ID.equals(client.getClientId()) || ADMIN_PERMISSIONS_CLIENT_ID.equals(client.getName())) {
+            if (isRealmManagementClient || isAdminPermissionsClient) {
                 throw new ImportProcessingException(
                         "Cannot create system client '%s' in realm '%s': System clients should be auto-created by Keycloak",
                         getClientIdentifier(client), realmName
@@ -366,7 +377,12 @@ public class ClientImportService {
 
             // FGAP V2: admin-permissions client may return 400 when server-managed. Swallow as defensive fallback.
             if (status == 400 && ADMIN_PERMISSIONS_CLIENT_ID.equals(patchedClient.getClientId())) {
-                logger.debug("Skipping update for 'admin-permissions' client in realm '{}' - FGAP V2 manages this client internally", realmName);
+                logger.debug("Skipping update for '{}' client in realm '{}' "
+                        + "- FGAP V2 manages this client internally", ADMIN_PERMISSIONS_CLIENT_ID, realmName);
+                return;
+            } else if (status == 403 && REALM_MANAGEMENT_CLIENT_ID.equals(patchedClient.getClientId())) {
+                logger.debug("Skipping update for '{}' client in realm '{}' "
+                        + "- It's system managed by Keycloak", REALM_MANAGEMENT_CLIENT_ID, realmName);
                 return;
             }
 
